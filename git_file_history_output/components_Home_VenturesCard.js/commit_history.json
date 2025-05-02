@@ -1,0 +1,8 @@
+[
+  {
+    "commit_time": "2024-09-08T18:19:05+05:30",
+    "commit_hash": "00b419e694cac79b3d42f30d2ca01aba90004f57",
+    "commit_message": "add to homepage",
+    "diff": "diff --git a/components/Home/VenturesCard.js b/components/Home/VenturesCard.js\nnew file mode 100644\nindex 0000000..031c616\n--- /dev/null\n+++ b/components/Home/VenturesCard.js\n@@ -0,0 +1,20 @@\n+import Image from \"next/image\";\n+import React from \"react\";\n+\n+const VenturesCard = ({ src, title, description }) => {\n+  return (\n+    <div className=\"p-4 md:p-8 border-2 h-full bg-white rounded-3xl flex flex-col items-center\" >\n+      <Image\n+        src={src}\n+        alt={title}\n+        className=\"h-32 w-auto object-contain\"\n+        width={1000}\n+        height={1000}\n+      />\n+      <h2 className=\"text-2xl font-forum text-center\">{title}</h2>\n+      <p className=\"px-4 text-center\">{description}</p>\n+    </div>\n+  );\n+};\n+\n+export default VenturesCard;"
+  }
+]

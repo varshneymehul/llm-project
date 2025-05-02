@@ -1,0 +1,8 @@
+[
+  {
+    "commit_time": "2024-09-09T03:48:03+05:30",
+    "commit_hash": "fc2b0217e84cc905542bea9e1602433464452c39",
+    "commit_message": "add images to all pages",
+    "diff": "diff --git a/components/JourneyTile.js b/components/JourneyTile.js\nnew file mode 100644\nindex 0000000..83c26d6\n--- /dev/null\n+++ b/components/JourneyTile.js\n@@ -0,0 +1,51 @@\n+\"use client\";\n+import Image from \"next/image\";\n+import React from \"react\";\n+\n+import { motion } from \"framer-motion\";\n+\n+const JourneyTile = ({ src, title, subheading, description }) => {\n+  const introHeaderVariants = {\n+    hide: {\n+      opacity: 0,\n+      y: -10,\n+    },\n+    show: {\n+      opacity: 1,\n+      y: 0,\n+      transition: {\n+        duration: 2,\n+      },\n+    },\n+  };\n+  return (\n+    <motion.div\n+      initial=\"hide\"\n+      whileInView=\"show\"\n+      exit=\"hide\"\n+      variants={introHeaderVariants}\n+      className=\"rounded-3xl m-4 md:m-8 border-2 border-slate-300 p-4 md:p-8 md:flex\"\n+    >\n+      <div className=\"md:w-2/5 flex flex-col justify-center\">\n+        <Image\n+          className=\"w-full rounded-3xl\"\n+          src={src}\n+          alt={title}\n+          height={2000}\n+          width={2000}\n+        />\n+      </div>\n+      <div className=\"md:w-3/5 p-4 md:p-8 flex flex-col justify-center\">\n+        <h1 className=\"text-4xl md:text-5xl font-forum py-2 text-white\">\n+          {title}\n+        </h1>\n+        <h2 className=\"text-xl md:text-2xl pb-2 text-blue-200\">\n+          {subheading && subheading}\n+        </h2>\n+        <p className=\"text-lg text-white\">{description}</p>\n+      </div>\n+    </motion.div>\n+  );\n+};\n+\n+export default JourneyTile;"
+  }
+]

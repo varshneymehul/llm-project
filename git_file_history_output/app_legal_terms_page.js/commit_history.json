@@ -1,0 +1,8 @@
+[
+  {
+    "commit_time": "2024-09-02T02:01:08+05:30",
+    "commit_hash": "da777d29b5024d7ae5ed85b2b51829ee16f8d738",
+    "commit_message": "header and footer",
+    "diff": "diff --git a/app/legal/terms/page.js b/app/legal/terms/page.js\nnew file mode 100644\nindex 0000000..4594ece\n--- /dev/null\n+++ b/app/legal/terms/page.js\n@@ -0,0 +1,9 @@\n+import React from 'react'\n+\n+const TermsAndConditions = () => {\n+  return (\n+    <div>TermsAndConditions</div>\n+  )\n+}\n+\n+export default TermsAndConditions\n\\ No newline at end of file"
+  }
+]

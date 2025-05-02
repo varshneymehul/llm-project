@@ -1,0 +1,14 @@
+[
+  {
+    "commit_time": "2024-09-09T03:48:03+05:30",
+    "commit_hash": "fc2b0217e84cc905542bea9e1602433464452c39",
+    "commit_message": "add images to all pages",
+    "diff": "diff --git a/components/WhatCard.js b/components/WhatCard.js\nnew file mode 100644\nindex 0000000..e34294f\n--- /dev/null\n+++ b/components/WhatCard.js\n@@ -0,0 +1,18 @@\n+import React from \"react\";\n+\n+const WhatCard = ({ type, text }) => {\n+  return (\n+    <div className=\"p-4\">\n+      <h1 className=\"text-2xl py-2 sm:text-3xl md:text-4xl font-forum uppercase text-sky-900\">\n+        {type === \"what\" ? \"What?\" : \"How?\"}\n+      </h1>\n+      <p className=\"absolute text-9xl -z-10 block text-gray-100 uppercase\">\n+\n+        {type === \"what\" ? \"What?\" : \"How?\"}\n+      </p>\n+      <p className=\"text-lg\">{text}</p>\n+    </div>\n+  );\n+};\n+\n+export default WhatCard;"
+  },
+  {
+    "commit_time": "2024-09-09T22:52:37+05:30",
+    "commit_hash": "d272edbea98ea783afe0b30278c444cc7765cbf5",
+    "commit_message": "fix horizontal scroll on why card",
+    "diff": "diff --git a/components/WhatCard.js b/components/WhatCard.js\nindex e34294f..3614520 100644\n--- a/components/WhatCard.js\n+++ b/components/WhatCard.js\n@@ -6,8 +6,7 @@ const WhatCard = ({ type, text }) => {\n       <h1 className=\"text-2xl py-2 sm:text-3xl md:text-4xl font-forum uppercase text-sky-900\">\n         {type === \"what\" ? \"What?\" : \"How?\"}\n       </h1>\n-      <p className=\"absolute text-9xl -z-10 block text-gray-100 uppercase\">\n-\n+      <p className=\"absolute text-8xl  -z-10 block text-gray-100 uppercase overflow-hidden\">\n         {type === \"what\" ? \"What?\" : \"How?\"}\n       </p>\n       <p className=\"text-lg\">{text}</p>"
+  }
+]

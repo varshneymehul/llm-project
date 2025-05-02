@@ -1,0 +1,14 @@
+[
+  {
+    "commit_time": "2024-09-02T00:26:09+05:30",
+    "commit_hash": "b143eb2c4d3bc866d3f805b979886d5e0d27f29c",
+    "commit_message": "Initial commit from Create Next App",
+    "diff": "diff --git a/app/favicon.ico b/app/favicon.ico\nnew file mode 100644\nindex 0000000..718d6fe\nBinary files /dev/null and b/app/favicon.ico differ"
+  },
+  {
+    "commit_time": "2024-09-02T00:51:11+05:30",
+    "commit_hash": "9cf1a6d4b4b9dbbfde9f92e4f06fdcf80359b0df",
+    "commit_message": "first push",
+    "diff": "diff --git a/app/favicon.ico b/app/favicon.ico\nindex 718d6fe..4d96233 100644\nBinary files a/app/favicon.ico and b/app/favicon.ico differ"
+  }
+]

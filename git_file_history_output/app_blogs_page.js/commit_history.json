@@ -1,0 +1,14 @@
+[
+  {
+    "commit_time": "2024-09-02T00:51:11+05:30",
+    "commit_hash": "9cf1a6d4b4b9dbbfde9f92e4f06fdcf80359b0df",
+    "commit_message": "first push",
+    "diff": "diff --git a/app/blogs/page.js b/app/blogs/page.js\nnew file mode 100644\nindex 0000000..63ce955\n--- /dev/null\n+++ b/app/blogs/page.js\n@@ -0,0 +1,5 @@\n+const Blogs = () => {\n+  return <div>page</div>;\n+};\n+\n+export default Blogs;"
+  },
+  {
+    "commit_time": "2024-09-03T19:07:54+05:30",
+    "commit_hash": "54b401c3c899a7b09169759e69ec00de757e924a",
+    "commit_message": "hero section for front page",
+    "diff": "diff --git a/app/blogs/page.js b/app/blogs/page.js\nindex 63ce955..de2bf0b 100644\n--- a/app/blogs/page.js\n+++ b/app/blogs/page.js\n@@ -1,5 +1,16 @@\n const Blogs = () => {\n-  return <div>page</div>;\n+  return (\n+    <div>\n+      {/* Hero */}\n+      <section>\n+        <h1></h1>\n+      </section>\n+\n+      <section>\n+        \n+      </section>\n+    </div>\n+  );\n };\n \n export default Blogs;"
+  }
+]

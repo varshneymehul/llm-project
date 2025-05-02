@@ -1,0 +1,14 @@
+[
+  {
+    "commit_time": "2024-09-08T18:19:05+05:30",
+    "commit_hash": "00b419e694cac79b3d42f30d2ca01aba90004f57",
+    "commit_message": "add to homepage",
+    "diff": "diff --git a/public/img/team/venu_gopal.jpeg b/public/img/team/venu_gopal.jpeg\nnew file mode 100644\nindex 0000000..3b2dd79\nBinary files /dev/null and b/public/img/team/venu_gopal.jpeg differ"
+  },
+  {
+    "commit_time": "2024-09-09T22:46:33+05:30",
+    "commit_hash": "c892a6ca6741479d5f3d90b7e5d65e736f53e86f",
+    "commit_message": "compress images",
+    "diff": "diff --git a/public/img/team/venu_gopal.jpeg b/public/img/team/venu_gopal.jpeg\nindex 3b2dd79..c8af152 100644\nBinary files a/public/img/team/venu_gopal.jpeg and b/public/img/team/venu_gopal.jpeg differ"
+  }
+]

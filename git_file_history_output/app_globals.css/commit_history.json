@@ -1,0 +1,26 @@
+[
+  {
+    "commit_time": "2024-09-02T00:26:09+05:30",
+    "commit_hash": "b143eb2c4d3bc866d3f805b979886d5e0d27f29c",
+    "commit_message": "Initial commit from Create Next App",
+    "diff": "diff --git a/app/globals.css b/app/globals.css\nnew file mode 100644\nindex 0000000..875c01e\n--- /dev/null\n+++ b/app/globals.css\n@@ -0,0 +1,33 @@\n+@tailwind base;\n+@tailwind components;\n+@tailwind utilities;\n+\n+:root {\n+  --foreground-rgb: 0, 0, 0;\n+  --background-start-rgb: 214, 219, 220;\n+  --background-end-rgb: 255, 255, 255;\n+}\n+\n+@media (prefers-color-scheme: dark) {\n+  :root {\n+    --foreground-rgb: 255, 255, 255;\n+    --background-start-rgb: 0, 0, 0;\n+    --background-end-rgb: 0, 0, 0;\n+  }\n+}\n+\n+body {\n+  color: rgb(var(--foreground-rgb));\n+  background: linear-gradient(\n+      to bottom,\n+      transparent,\n+      rgb(var(--background-end-rgb))\n+    )\n+    rgb(var(--background-start-rgb));\n+}\n+\n+@layer utilities {\n+  .text-balance {\n+    text-wrap: balance;\n+  }\n+}"
+  },
+  {
+    "commit_time": "2024-09-02T00:51:11+05:30",
+    "commit_hash": "9cf1a6d4b4b9dbbfde9f92e4f06fdcf80359b0df",
+    "commit_message": "first push",
+    "diff": "diff --git a/app/globals.css b/app/globals.css\nindex 875c01e..a90f074 100644\n--- a/app/globals.css\n+++ b/app/globals.css\n@@ -2,32 +2,3 @@\n @tailwind components;\n @tailwind utilities;\n \n-:root {\n-  --foreground-rgb: 0, 0, 0;\n-  --background-start-rgb: 214, 219, 220;\n-  --background-end-rgb: 255, 255, 255;\n-}\n-\n-@media (prefers-color-scheme: dark) {\n-  :root {\n-    --foreground-rgb: 255, 255, 255;\n-    --background-start-rgb: 0, 0, 0;\n-    --background-end-rgb: 0, 0, 0;\n-  }\n-}\n-\n-body {\n-  color: rgb(var(--foreground-rgb));\n-  background: linear-gradient(\n-      to bottom,\n-      transparent,\n-      rgb(var(--background-end-rgb))\n-    )\n-    rgb(var(--background-start-rgb));\n-}\n-\n-@layer utilities {\n-  .text-balance {\n-    text-wrap: balance;\n-  }\n-}"
+  },
+  {
+    "commit_time": "2024-09-08T18:19:05+05:30",
+    "commit_hash": "00b419e694cac79b3d42f30d2ca01aba90004f57",
+    "commit_message": "add to homepage",
+    "diff": "diff --git a/app/globals.css b/app/globals.css\nindex a90f074..d63e3c0 100644\n--- a/app/globals.css\n+++ b/app/globals.css\n@@ -2,3 +2,60 @@\n @tailwind components;\n @tailwind utilities;\n \n+.splide-fade-wrapper {\n+  position: relative;\n+  overflow: hidden;\n+}\n+\n+.splide-fade-overlay-left,\n+.splide-fade-overlay-right {\n+  position: absolute;\n+  top: 0;\n+  bottom: 0;\n+  margin: 0 3rem;\n+  width: 7rem; /* Adjust width to match your padding */\n+  z-index: 1;\n+  pointer-events: none; /* Allow interaction with the arrows */\n+}\n+\n+.splide-fade-overlay-left {\n+  left: 0;\n+  background: linear-gradient(\n+    to right,\n+    theme(colors.sky.100),\n+    rgba(255, 255, 255, 0)\n+  );\n+}\n+\n+.splide-fade-overlay-right {\n+  right: 0;\n+  background: linear-gradient(\n+    to left,\n+    theme(colors.sky.100),\n+    rgba(255, 255, 255, 0)\n+  );\n+}\n+\n+.splide-fade-overlay-left__partners,\n+.splide-fade-overlay-right__partners {\n+  position: absolute;\n+  top: 0;\n+  bottom: 0;\n+  margin: 0 3rem;\n+  width: 7rem; /* Adjust width to match your padding */\n+  z-index: 1;\n+  pointer-events: none; /* Allow interaction with the arrows */\n+}\n+.splide-fade-overlay-left__partners {\n+  left: 0;\n+  background: linear-gradient(to right, white, rgba(255, 255, 255, 0));\n+}\n+\n+.splide-fade-overlay-right__partners {\n+  right: 0;\n+  background: linear-gradient(\n+    to left,\n+    theme(colors.white),\n+    rgba(255, 255, 255, 0)\n+  );\n+}"
+  },
+  {
+    "commit_time": "2024-09-08T23:35:01+05:30",
+    "commit_hash": "078973084b5f858f688615df7b21fd923480f56c",
+    "commit_message": "fix slider",
+    "diff": "diff --git a/app/globals.css b/app/globals.css\nindex d63e3c0..b313c22 100644\n--- a/app/globals.css\n+++ b/app/globals.css\n@@ -46,6 +46,12 @@\n   z-index: 1;\n   pointer-events: none; /* Allow interaction with the arrows */\n }\n+@media only screen and (max-width: 768px) {\n+  .splide-fade-overlay-left__partners,\n+  .splide-fade-overlay-right__partners {\n+    margin: 0;\n+  }\n+}\n .splide-fade-overlay-left__partners {\n   left: 0;\n   background: linear-gradient(to right, white, rgba(255, 255, 255, 0));"
+  }
+]

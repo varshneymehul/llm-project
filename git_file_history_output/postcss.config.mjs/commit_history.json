@@ -1,0 +1,8 @@
+[
+  {
+    "commit_time": "2024-09-02T00:26:09+05:30",
+    "commit_hash": "b143eb2c4d3bc866d3f805b979886d5e0d27f29c",
+    "commit_message": "Initial commit from Create Next App",
+    "diff": "diff --git a/postcss.config.mjs b/postcss.config.mjs\nnew file mode 100644\nindex 0000000..1a69fd2\n--- /dev/null\n+++ b/postcss.config.mjs\n@@ -0,0 +1,8 @@\n+/** @type {import('postcss-load-config').Config} */\n+const config = {\n+  plugins: {\n+    tailwindcss: {},\n+  },\n+};\n+\n+export default config;"
+  }
+]

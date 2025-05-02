@@ -1,0 +1,14 @@
+[
+  {
+    "commit_time": "2024-09-02T00:51:11+05:30",
+    "commit_hash": "9cf1a6d4b4b9dbbfde9f92e4f06fdcf80359b0df",
+    "commit_message": "first push",
+    "diff": "diff --git a/app/components/Sidebar.js b/app/components/Sidebar.js\nnew file mode 100644\nindex 0000000..8ec5d80\n--- /dev/null\n+++ b/app/components/Sidebar.js\n@@ -0,0 +1,9 @@\n+import React from 'react'\n+\n+const Sidebar = () => {\n+  return (\n+    <div>Sidebar</div>\n+  )\n+}\n+\n+export default Sidebar\n\\ No newline at end of file"
+  },
+  {
+    "commit_time": "2024-09-02T00:52:22+05:30",
+    "commit_hash": "967c18ecddc1d219d47e5aa6d7b160468391856a",
+    "commit_message": "make layout",
+    "diff": "diff --git a/app/components/Sidebar.js b/app/components/Sidebar.js\nindex 8ec5d80..3509401 100644\n--- a/app/components/Sidebar.js\n+++ b/app/components/Sidebar.js\n@@ -2,7 +2,7 @@ import React from 'react'\n \n const Sidebar = () => {\n   return (\n-    <div>Sidebar</div>\n+    <div></div>\n   )\n }\n "
+  }
+]

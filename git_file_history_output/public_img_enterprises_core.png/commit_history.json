@@ -1,0 +1,14 @@
+[
+  {
+    "commit_time": "2024-09-09T03:48:03+05:30",
+    "commit_hash": "fc2b0217e84cc905542bea9e1602433464452c39",
+    "commit_message": "add images to all pages",
+    "diff": "diff --git a/public/img/enterprises/core.png b/public/img/enterprises/core.png\nnew file mode 100644\nindex 0000000..69998d3\nBinary files /dev/null and b/public/img/enterprises/core.png differ"
+  },
+  {
+    "commit_time": "2024-09-09T22:46:33+05:30",
+    "commit_hash": "c892a6ca6741479d5f3d90b7e5d65e736f53e86f",
+    "commit_message": "compress images",
+    "diff": "diff --git a/public/img/enterprises/core.png b/public/img/enterprises/core.png\nindex 69998d3..b7faf1a 100644\nBinary files a/public/img/enterprises/core.png and b/public/img/enterprises/core.png differ"
+  }
+]
