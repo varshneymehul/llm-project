@@ -5,7 +5,7 @@
     "commit_message": "add to homepage",
     "diff": "diff --git a/public/img/team/venu_gopal.jpeg b/public/img/team/venu_gopal.jpeg\nnew file mode 100644\nindex 0000000..3b2dd79\nBinary files /dev/null and b/public/img/team/venu_gopal.jpeg differ"
   },
-  {
+  { 
     "commit_time": "2024-09-09T22:46:33+05:30",
     "commit_hash": "c892a6ca6741479d5f3d90b7e5d65e736f53e86f",
     "commit_message": "compress images",

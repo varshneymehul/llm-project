@@ -1,5 +1,9 @@
 Summary of jsconfig.json:
+time, message,
 This is a `tsconfig.json` file, a configuration file for TypeScript projects.  It tells the TypeScript compiler how to handle imports.  Specifically, it says that if you import something starting with `@/`,  it should look for that file in the current directory (`.`).  This is a common setup for organizing code in a project.
+
+next time, next message
+
 
 ==================================================
 Summary of tailwind.config.js:
