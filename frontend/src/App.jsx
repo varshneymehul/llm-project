@@ -1,4 +1,5 @@
 import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import Login from "./Login";
@@ -63,7 +64,13 @@ function App() {
   if (!token) return <Login setToken={setToken} />;
 
   return (
-    <ErrorBoundary fallback={<div className="text-red-600 p-4">Something went wrong while rendering markdown.</div>}>
+    <ErrorBoundary
+      fallback={
+        <div className="text-red-600 p-4">
+          Something went wrong while rendering markdown.
+        </div>
+      }
+    >
       <div className="flex flex-col h-screen mx-auto w-4/5">
         <div className="flex-1 overflow-y-auto p-6 space-y-4 overflow-scroll">
           {messages.map((msg, index) => (
@@ -75,36 +82,67 @@ function App() {
                   : "bg-stone-900 justify-self-start"
               }`}
             >
-              <ReactMarkdown
-                skipHtml={false}
-                unwrapDisallowed={true}
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  p: ({ node, ...props }) => <p style={{ whiteSpace: "pre-wrap" }} {...props} />,
-                  code({ node, inline, className, children, ...props }) {
-                    return !inline ? (
-                      <pre className="bg-gray-900 text-white p-2 rounded overflow-x-auto">
-                        <code {...props}>{children}</code>
-                      </pre>
-                    ) : (
-                      <code className="bg-gray-800 text-white px-1 rounded" {...props}>
+              <div>
+                <ReactMarkdown
+                  skipHtml={false}
+                  unwrapDisallowed={true}
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  components={{
+                    p: ({ node, ...props }) => (
+                      <p
+                        className="whitespace-pre-wrap"
+                        style={{ whiteSpace: "pre-wrap" }}
+                        {...props}
+                      />
+                    ),
+                    code({ node, className, children, ...props }) {
+                      const isInline =
+                        !node?.position ||
+                        node.position.start.line === node.position.end.line;
+
+                      if (isInline) {
+                        return (
+                          <code
+                            className="bg-gray-800 text-white px-1 py-0.5 rounded text-sm"
+                            style={{ whiteSpace: "pre-wrap" }}
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
+                      }
+
+                      return (
+                        <pre
+                          className="bg-gray-900 text-white p-3 rounded overflow-x-auto my-2"
+                          style={{ whiteSpace: "pre-wrap" }}
+                        >
+                          <code className={className} {...props}>
+                            {children}
+                          </code>
+                        </pre>
+                      );
+                    },
+                    table: ({ children }) => (
+                      <table className="table-auto border-collapse border border-gray-500">
                         {children}
-                      </code>
-                    );
-                  },
-                  table: ({ children }) => (
-                    <table className="table-auto border-collapse border border-gray-500">{children}</table>
-                  ),
-                  th: ({ children }) => (
-                    <th className="border border-gray-500 px-2 py-1 font-bold">{children}</th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="border border-gray-500 px-2 py-1">{children}</td>
-                  ),
-                }}
-              >
-                {msg.text}
-              </ReactMarkdown>
+                      </table>
+                    ),
+                    th: ({ children }) => (
+                      <th className="border border-gray-500 px-2 py-1 font-bold">
+                        {children}
+                      </th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="border border-gray-500 px-2 py-1">
+                        {children}
+                      </td>
+                    ),
+                  }}
+                >
+                  {msg.text.replace(/\\n/g, "\n")}
+                </ReactMarkdown>
+              </div>
             </div>
           ))}
           <div ref={messagesEndRef} />

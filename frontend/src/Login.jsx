@@ -19,16 +19,21 @@ function Login({ setToken }) {
   };
 
   return (
-    <div className="min-h-screen min-w-screen flex items-center justify-center">
-      <div className="bg-stone-200 backdrop-blur-3xl p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+    <div className="flex flex-col align-middle min-h-screen min-w-screen items-center justify-center">
+      <div className="m-8">
+        <h1 className="text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-indigo-500 to-green-500 animate-gradient">
+          GitDriller
+        </h1>
+      </div>
+      <div className=" backdrop-blur-3xl border-2 border-dashed p-4 rounded-lg shadow-md ">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-200">
           Sign in to your account
         </h2>
-        <form onSubmit={login} className="space-y-5">
+        <form onSubmit={login} className="space-x-5 flex items-center">
           <div>
             <label
               htmlFor="username"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-200"
             >
               Username
             </label>
@@ -45,7 +50,7 @@ function Login({ setToken }) {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-200"
             >
               Password
             </label>
@@ -59,10 +64,10 @@ function Login({ setToken }) {
               placeholder="Enter your password"
             />
           </div>
-          <div>
+          <div className="align-bottom h-full">
             <button
               type="submit"
-              className="w-full flex justify-center py-2 px-4 border cursor-pointer transition-all border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full align-bottom justify-center h-fit p-2 border cursor-pointer transition-all border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               Sign In
             </button>

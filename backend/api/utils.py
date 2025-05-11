@@ -144,6 +144,20 @@ def is_binary_file(file_path):
     ]
     return Path(file_path).suffix.lower() in binary_extensions
 
+def is_asset_file(file_path):
+    """Check if a file is an asset file (images, fonts, etc.)"""
+    asset_extensions = [
+        # Images
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".bmp",
+        # Fonts
+        ".ttf", ".otf", ".woff", ".woff2", ".eot",
+        # Other media
+        ".mp3", ".mp4", ".wav", ".ogg", ".avi", ".mov", 
+        # Other assets
+        ".pdf", ".psd", ".ai"
+    ]
+    return Path(file_path).suffix.lower() in asset_extensions
+
 
 def count_files_in_directory(directory, skip_binary=True):
     """Count the number of files in a directory recursively"""

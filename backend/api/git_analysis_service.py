@@ -8,11 +8,12 @@ from git import Repo
 from collections import defaultdict
 import re
 
-from .utils import GitAnalysisConfig, GitProjectState, is_binary_file
+from .utils import GitAnalysisConfig, GitProjectState, is_binary_file, is_asset_file
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # Set up logging
 logger = logging.getLogger(__name__)
+logging.getLogger("faiss").setLevel(logging.ERROR)
 
 # Load configuration
 config = GitAnalysisConfig()
@@ -121,7 +122,7 @@ class GitAnalysisService:
                 # Fallback to the standard empty tree hash if command fails
                 NULL_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
                 logger.warning(f"Using default NULL_TREE hash: {NULL_TREE}. Error: {e}")
-                
+
             file_commit_data = defaultdict(list)
 
             # Safe folder name maker
@@ -169,11 +170,20 @@ class GitAnalysisService:
                 safe_name = safe_folder_name(file_path)
                 full_folder_path = self.config.git_history_dir / safe_name
                 full_folder_path.mkdir(exist_ok=True)
-
+                 # Add file information to the JSON structure
+                file_info = {
+                    "file_path": file_path,
+                    "file_name": os.path.basename(file_path),
+                    "file_extension": os.path.splitext(file_path)[1],
+                    "commit_count": len(commits),
+                    "first_commit_date": commits[0]["commit_time"] if commits else None,
+                    "last_commit_date": commits[-1]["commit_time"] if commits else None,
+                    "commits": commits
+                }
                 # Save JSON file
                 json_path = full_folder_path / "commit_history.json"
                 with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(commits, f, indent=2, ensure_ascii=False)
+                    json.dump(file_info, f, indent=2, ensure_ascii=False)
 
             logger.info(
                 f"Git history analysis complete. Output saved to: {self.config.git_history_dir}"
@@ -213,7 +223,7 @@ class GitAnalysisService:
                 prompt = (
                     "You are a helpful assistant. Provide concise summaries of the text. "
                     "If the file contains any code write about every function present in the file, "
-                    "else describe the file contents clearly like how you would explain it to a 5 year old"
+                    "else describe the file contents clearly like how you would explain it to a 5 year old. Please keep all import statements to preserve the dependencies."
                     "\n\n" + file_content
                 )
 
@@ -242,7 +252,15 @@ class GitAnalysisService:
                     # Skip binary files and other non-text files
                     if is_binary_file(file_path):
                         continue
-
+                    # Handle asset files differently - just record them without summarizing
+                    if is_asset_file(file_path):
+                        # Store a simple record of the asset file
+                        relative_path = str(file_path.relative_to(repo_path_obj))
+                        summaries[relative_path] = (
+                            f"[ASSET FILE] {filename} - Type: {file_path.suffix}"
+                        )
+                        logger.info(f"Recorded asset file: {relative_path}")
+                        continue
                     try:
                         # Read the file content
                         file_content = get_file_content(file_path)
@@ -298,7 +316,7 @@ class GitAnalysisService:
             from langchain.docstore.document import Document
             from langchain.text_splitter import RecursiveCharacterTextSplitter
             from langchain_community.vectorstores import FAISS
-            from langchain_community.embeddings import HuggingFaceEmbeddings
+            from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 
             # Load documents from folders
             def load_folder(folder_path, source_label):
@@ -394,7 +412,7 @@ class GitAnalysisService:
 
         try:
             from langchain_community.vectorstores import FAISS
-            from langchain_community.embeddings import HuggingFaceEmbeddings
+            from langchain_huggingface import HuggingFaceEmbeddings
             from langchain.chains import ConversationalRetrievalChain
             from langchain.memory import ConversationBufferMemory
             from langchain.prompts import PromptTemplate
@@ -417,7 +435,7 @@ class GitAnalysisService:
                 input_variables=["context", "chat_history", "question"],
                 template="""
                 You are a Git repository analysis assistant. You help users understand codebases by analyzing
-                Git history, summarizing files, and answering questions about code changes and functionality.
+                Git history, summarizing files, and answering questions about code changes and functionality. Please make sure that your response has newline characters \\n to separate the different sections.
                 
                 Use this context to help answer the user's query:
                 {context}
@@ -430,7 +448,7 @@ class GitAnalysisService:
 
             # Set up memory
             memory = ConversationBufferMemory(
-                memory_key="chat_history", return_messages=True
+                memory_key="chat_history", return_messages=True, output_key="answer"
             )
 
             # Create chain
@@ -439,6 +457,9 @@ class GitAnalysisService:
                 retriever=retriever,
                 memory=memory,
                 combine_docs_chain_kwargs={"prompt": prompt},
+                return_source_documents=True,  # Add this to return source documents
+                verbose=True,  # Make debug logging more visible
+                output_key="answer",  # Add this line to specify which output to store
             )
 
             self.state.mark_vector_db_loaded()
@@ -496,13 +517,6 @@ class GitAnalysisService:
                 return
             yield f"{message}\n"
             time.sleep(0.5)
-
-            # Initialize retrieval chain
-            yield "Initializing question answering system...\n"
-            success, _ = self.initialize_retrieval_chain()
-            if not success:
-                yield f"Error: Failed to initialize question answering system\n"
-                return
 
             yield "\nAnalysis complete! You can now ask questions about the repository."
 

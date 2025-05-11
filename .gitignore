@@ -1,3 +1,7 @@
 .venv/
 .env
 turning-ideas/
+backend/api/cloned_repos/
+backend/api/faiss_repo_knowledge/
+backend/api/git_file_history_output/
+backend/api/summaries/
