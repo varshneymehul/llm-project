@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2024-09-09T22:32:31+05:30",
-    "commit_hash": "b14158f86a585eb316cc66c031d519d243730989",
-    "commit_message": "add faqs",
-    "diff": "diff --git a/components/InterestedCTA.js b/components/InterestedCTA.js\nnew file mode 100644\nindex 0000000..4282636\n--- /dev/null\n+++ b/components/InterestedCTA.js\n@@ -0,0 +1,23 @@\n+import React from \"react\";\n+\n+const InterestedCTA = () => {\n+  return (\n+    <section className=\"p-4 m-4 md:m-20 md:p-12 bg-pink-900 rounded-3xl flex flex-col md:flex-row justify-between\">\n+      <div>\n+        <h1 className=\"text-3xl md:text-5xl pt-4 font-forum text-white\">\n+          INTERESTED?\n+        </h1>\n+        <p className=\"text-lg py-2 md:text-xl text-white\">\n+          Looking to innovate? Let&apos;s work together.\n+        </p>\n+      </div>\n+      <div className=\"h-full flex flex-col justify-center my-auto\">\n+        <button className=\"block rounded-full bg-white hover:bg-transparent hover:text-white transition-all px-6 md:px-24 hover:border-2 py-2 md:py-6 text-xl font-medium text-black backdrop-blur-3xl\">\n+          Apply\n+        </button>\n+      </div>\n+    </section>\n+  );\n+};\n+\n+export default InterestedCTA;"
-  }
-]

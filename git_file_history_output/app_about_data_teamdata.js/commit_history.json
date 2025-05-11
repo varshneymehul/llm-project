@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2024-09-08T18:19:05+05:30",
-    "commit_hash": "00b419e694cac79b3d42f30d2ca01aba90004f57",
-    "commit_message": "add to homepage",
-    "diff": "diff --git a/app/about/data/teamdata.js b/app/about/data/teamdata.js\nnew file mode 100644\nindex 0000000..783f474\n--- /dev/null\n+++ b/app/about/data/teamdata.js\n@@ -0,0 +1,27 @@\n+const teamData = [\n+  {\n+    name: \"Ashish Mittal\",\n+    image: \"/img/team/ashish_mittal.jpeg\",\n+  },\n+  {\n+    name: \"Ashish Agarwal\",\n+    image: \"/img/team/ashish_agarwal.jpeg\",\n+  },\n+  {\n+    name: \"Himanshu Periwal\",\n+    image: \"/img/team/himanshu_periwal.jpeg\",\n+  },\n+  {\n+    name: \"Venu Gopal\",\n+    image: \"/img/team/venu_gopal.jpeg\",\n+  },\n+  {\n+    name: \"Andrew Seit\",\n+    image: \"/img/team/andrew_seit.jpeg\",\n+  },\n+  {\n+    name: \"Sumit Kanu\",\n+    image: \"/img/team/sumit_kanu.jpeg\",\n+  },\n+];\n+export default teamData;\n\\ No newline at end of file"
-  }
-]

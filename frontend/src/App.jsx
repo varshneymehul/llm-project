@@ -5,6 +5,7 @@ import axios from "axios";
 import Login from "./Login";
 import ReactMarkdown from "react-markdown";
 import { ErrorBoundary } from "react-error-boundary";
+import Button from "./components/Button";
 
 function App() {
   const [token, setToken] = useState("");
@@ -167,12 +168,7 @@ function App() {
               }
             }}
           />
-          <button
-            onClick={askLLM}
-            className="bg-blue-600 text-white h-full cursor-pointer py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Send
-          </button>
+          <Button onClick={askLLM} disabled={input == ""} text="Send" />
         </div>
       </div>
     </ErrorBoundary>

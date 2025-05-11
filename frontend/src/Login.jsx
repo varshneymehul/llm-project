@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import Button from "./components/Button";
 
 function Login({ setToken }) {
   const [username, setUsername] = useState("");
@@ -64,13 +65,13 @@ function Login({ setToken }) {
               placeholder="Enter your password"
             />
           </div>
-          <div className="align-bottom h-full">
-            <button
+          <div className="flex flex-col justify-end h-full">
+            <Button
               type="submit"
-              className="w-full align-bottom justify-center h-fit p-2 border cursor-pointer transition-all border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              Sign In
-            </button>
+              text="Login"
+              onClick={login}
+              disabled={!username || !password}
+            />
           </div>
         </form>
       </div>

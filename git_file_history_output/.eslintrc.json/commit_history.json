@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2024-09-02T00:26:09+05:30",
-    "commit_hash": "b143eb2c4d3bc866d3f805b979886d5e0d27f29c",
-    "commit_message": "Initial commit from Create Next App",
-    "diff": "diff --git a/.eslintrc.json b/.eslintrc.json\nnew file mode 100644\nindex 0000000..bffb357\n--- /dev/null\n+++ b/.eslintrc.json\n@@ -0,0 +1,3 @@\n+{\n+  \"extends\": \"next/core-web-vitals\"\n+}"
-  }
-]

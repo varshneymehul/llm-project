@@ -26,10 +26,83 @@ class GitAnalysisService:
         self.config = GitAnalysisConfig()
         self.state = GitProjectState()
         self._setup_intent_classifier()
+        # Create a file index to help with retrieval
+        self.file_index = {}
 
     def _setup_intent_classifier(self):
         """Setup the intent classifier to determine if a message is requesting git analysis"""
         self.intent_llm = self.get_llm(temperature=0.1)
+
+    def _summarize_diff(self, diff_text):
+        """Analyze a diff text and create a concise summary of the changes"""
+        # Parse additions and deletions
+        added_lines = []
+        removed_lines = []
+
+        for line in diff_text.split("\n"):
+            line = line.strip()
+            if line.startswith("+") and not line.startswith("+++"):
+                added_lines.append(line[1:])
+            elif line.startswith("-") and not line.startswith("---"):
+                removed_lines.append(line[1:])
+
+        # Analyze the changes
+        summary = {}
+
+        # Count meaningful changes (ignore whitespace-only changes)
+        meaningful_additions = [line for line in added_lines if line.strip()]
+        meaningful_deletions = [line for line in removed_lines if line.strip()]
+
+        summary["lines_added"] = len(meaningful_additions)
+        summary["lines_removed"] = len(meaningful_deletions)
+
+        # Detect the type of change
+        if summary["lines_added"] > 0 and summary["lines_removed"] == 0:
+            summary["change_type"] = "Addition only"
+        elif summary["lines_added"] == 0 and summary["lines_removed"] > 0:
+            summary["change_type"] = "Deletion only"
+        elif summary["lines_added"] > 0 and summary["lines_removed"] > 0:
+            summary["change_type"] = "Modification"
+        else:
+            summary["change_type"] = "No meaningful changes"
+
+        # Analyze function changes for code files
+        function_pattern = r"[+-][\s]*(def|function|class|method)\s+([a-zA-Z0-9_]+)"
+        function_matches = re.findall(function_pattern, diff_text)
+
+        if function_matches:
+            summary["function_changes"] = []
+            for match in function_matches:
+                func_type, func_name = match
+                summary["function_changes"].append(f"{func_type} {func_name}")
+
+        # Look for significant additions
+        significant_added = []
+        for line in meaningful_additions:
+            # Look for non-comment, non-whitespace code with substantial content
+            if len(line.strip()) > 10 and not line.strip().startswith(
+                ("//", "#", "/*", "*", "<!--")
+            ):
+                significant_added.append(line.strip())
+
+        if significant_added:
+            # Only keep a limited sample of significant lines
+            summary["significant_additions"] = significant_added[:5]
+
+        # Look for significant deletions
+        significant_deleted = []
+        for line in meaningful_deletions:
+            # Look for non-comment, non-whitespace code with substantial content
+            if len(line.strip()) > 10 and not line.strip().startswith(
+                ("//", "#", "/*", "*", "<!--")
+            ):
+                significant_deleted.append(line.strip())
+
+        if significant_deleted:
+            # Only keep a limited sample of significant lines
+            summary["significant_deletions"] = significant_deleted[:5]
+
+        return summary
 
     def detect_analysis_intent(self, message):
         """
@@ -97,7 +170,7 @@ class GitAnalysisService:
             return False, f"Error cloning repository: {e}"
 
     def analyze_git_history(self):
-        """Analyze git history of the current repository"""
+        """Analyze git history of the current repository with improved metadata storage"""
         if not self.state.current_repo_path:
             return False, "No repository currently loaded"
 
@@ -123,45 +196,110 @@ class GitAnalysisService:
                 NULL_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
                 logger.warning(f"Using default NULL_TREE hash: {NULL_TREE}. Error: {e}")
 
+            # Global repository commit data
+            repo_commits = []
             file_commit_data = defaultdict(list)
+            commit_file_map = {}  # Map of commit hash to files changed
+
+            i = 1
+            # Loop through commits in chronological order
+            for commit in list(repo.iter_commits("--all", reverse=True)):
+                i+= 1
+                parents = commit.parents or []
+                commit_hash = commit.hexsha
+                commit_info = {
+                    "commit_hash": commit_hash,
+                    "commit_time": commit.committed_datetime.isoformat(),
+                    "author": f"{commit.author.name} <{commit.author.email}>",
+                    "commit_message": commit.message.strip(),
+                    "files_changed": [],
+                    "graph_path": None,  # Will store path to generated graphs
+                }
+
+                # Track files changed in this commit
+                files_changed = []
+
+                if not parents:
+                    files_changed = repo.git.diff(
+                        NULL_TREE, commit_hash, name_only=True
+                    ).splitlines()
+                else:
+                    files_changed = repo.git.diff(
+                        parents[0].hexsha, commit_hash, name_only=True
+                    ).splitlines()
+
+                # Add files to the commit info
+                commit_info["files_changed"] = files_changed
+                commit_file_map[commit_hash] = files_changed
+
+                # Save overall commit info
+                repo_commits.append(commit_info)
+
+                # Process each changed file
+                for file_path in files_changed:
+                    # Now get the diff for this specific file
+                    if not parents:
+                        diff_text = repo.git.diff(
+                            NULL_TREE, commit_hash, "--", file_path
+                        )
+                    else:
+                        diff_text = repo.git.diff(
+                            parents[0].hexsha, commit_hash, "--", file_path
+                        )
+
+                    # Extract just what changed (without redundancy)
+                    change_summary = self._analyze_diff_content(diff_text)
+
+                    # Store file commit data with minimal redundancy
+                    file_commit_record = {
+                        "commit_time": commit.committed_datetime.isoformat(),
+                        "commit_hash": commit_hash,
+                        "commit_message": commit.message.strip(),
+                        "author": f"{commit.author.name} <{commit.author.email}>",
+                        "change_summary": change_summary,
+                    }
+
+                    # Store diff text only if needed for complex changes that can't be fully captured in summary
+                    # if change_summary["change_type"] == "modification" and (
+                    #     len(change_summary["functions_modified"]) > 0
+                    #     or len(change_summary["classes_modified"]) > 0
+                    # ):
+                    #     file_commit_record["diff"] = diff_text
+
+                    file_commit_data[file_path].append(file_commit_record)
+
+                # Generate graphs for this commit
+                graph_dir = (
+                    self.config.git_history_dir / f"{i}_commit_{commit_hash[:8]}_graphs"
+                )
+                graph_dir.mkdir(exist_ok=True)
+                self._generate_commit_graphs(commit_hash, commit_file_map, graph_dir)
+                commit_info["graph_path"] = str(graph_dir)
+
+            # Save all repository commits in chronological order
+            repo_info = {
+                "repo_name": os.path.basename(repo_path),
+                "commit_count": len(repo_commits),
+                "first_commit_date": (
+                    repo_commits[0]["commit_time"] if repo_commits else None
+                ),
+                "last_commit_date": (
+                    repo_commits[-1]["commit_time"] if repo_commits else None
+                ),
+                "commits": repo_commits,
+                "commit_file_map": commit_file_map,
+            }
+
+            # Save repo commit history
+            repo_history_path = self.config.git_history_dir / "repo_history.json"
+            with open(repo_history_path, "w", encoding="utf-8") as f:
+                json.dump(repo_info, f, indent=2, ensure_ascii=False)
 
             # Safe folder name maker
             def safe_folder_name(name):
                 return re.sub(r'[\/:*?"<>|]', "_", name)
 
-            # Loop through commits
-            for commit in repo.iter_commits("--all"):
-                parents = commit.parents or []
-
-                if not parents:
-                    files_changed = repo.git.diff(
-                        NULL_TREE, commit.hexsha, name_only=True
-                    ).splitlines()
-                else:
-                    files_changed = repo.git.diff(
-                        parents[0].hexsha, commit.hexsha, name_only=True
-                    ).splitlines()
-
-                for file_path in files_changed:
-                    # Now get the diff for this specific file
-                    if not parents:
-                        diff_text = repo.git.diff(
-                            NULL_TREE, commit.hexsha, "--", file_path
-                        )
-                    else:
-                        diff_text = repo.git.diff(
-                            parents[0].hexsha, commit.hexsha, "--", file_path
-                        )
-
-                    file_commit_data[file_path].append(
-                        {
-                            "commit_time": commit.committed_datetime.isoformat(),
-                            "commit_hash": commit.hexsha,
-                            "commit_message": commit.message.strip(),
-                            "diff": diff_text,
-                        }
-                    )
-            # Now write output
+            # Now write per-file output
             for file_path, commits in file_commit_data.items():
                 # Sort by time
                 commits.sort(key=lambda x: x["commit_time"])
@@ -170,7 +308,11 @@ class GitAnalysisService:
                 safe_name = safe_folder_name(file_path)
                 full_folder_path = self.config.git_history_dir / safe_name
                 full_folder_path.mkdir(exist_ok=True)
-                 # Add file information to the JSON structure
+
+                # Add cumulative file insights by analyzing sequential changes
+                self._analyze_file_evolution(commits)
+
+                # Add file information to the JSON structure
                 file_info = {
                     "file_path": file_path,
                     "file_name": os.path.basename(file_path),
@@ -178,8 +320,9 @@ class GitAnalysisService:
                     "commit_count": len(commits),
                     "first_commit_date": commits[0]["commit_time"] if commits else None,
                     "last_commit_date": commits[-1]["commit_time"] if commits else None,
-                    "commits": commits
+                    "commits": commits,
                 }
+
                 # Save JSON file
                 json_path = full_folder_path / "commit_history.json"
                 with open(json_path, "w", encoding="utf-8") as f:
@@ -190,55 +333,822 @@ class GitAnalysisService:
             )
             return (
                 True,
-                f"Git history analysis complete. Found history for {len(file_commit_data)} files.",
+                f"Git history analysis complete. Found history for {len(file_commit_data)} files across {len(repo_commits)} commits.",
             )
 
         except Exception as e:
             logger.error(f"Error analyzing git history: {e}")
             return False, f"Error analyzing git history: {e}"
 
+    def _analyze_file_evolution(self, commits):
+        """Analyze the evolution of a file across multiple commits"""
+        if not commits:
+            return
+
+        # Initialize tracking variables
+        current_functions = set()
+        current_classes = set()
+        current_imports = set()
+
+        # Process commits in chronological order to track evolution
+        for i, commit in enumerate(commits):
+            summary = commit["change_summary"]
+
+            # Update tracked elements
+            if "functions_added" in summary:
+                current_functions.update(summary["functions_added"])
+            if "functions_removed" in summary:
+                current_functions.difference_update(summary["functions_removed"])
+
+            if "classes_added" in summary:
+                current_classes.update(summary["classes_added"])
+            if "classes_removed" in summary:
+                current_classes.difference_update(summary["classes_removed"])
+
+            if "imports_added" in summary:
+                current_imports.update(summary["imports_added"])
+            if "imports_removed" in summary:
+                current_imports.difference_update(summary["imports_removed"])
+
+            # Add state after this commit
+            commit["cumulative_state"] = {
+                "functions": list(current_functions),
+                "classes": list(current_classes),
+                "imports": list(current_imports),
+            }
+
+            # For all but the first commit, compute what changed since previous
+            if i > 0:
+                prev = commits[i - 1].get("cumulative_state", {})
+                curr = commit["cumulative_state"]
+
+                # Check what's new compared to previous state
+                commit["evolution"] = {
+                    "new_functions": [
+                        f
+                        for f in curr["functions"]
+                        if f not in prev.get("functions", [])
+                    ],
+                    "new_classes": [
+                        c for c in curr["classes"] if c not in prev.get("classes", [])
+                    ],
+                    "new_imports": [
+                        imp
+                        for imp in curr["imports"]
+                        if imp not in prev.get("imports", [])
+                    ],
+                }
+
+    def _generate_commit_graphs(self, commit_hash, commit_file_map, output_dir):
+        """Generate dependency graphs for a specific commit with cumulative dependencies"""
+        from pathlib import Path
+        import networkx as nx
+        import matplotlib.pyplot as plt
+        import os
+        
+        # Create output directory if it doesn't exist
+        output_dir.mkdir(exist_ok=True)
+        
+        # Get the repo object
+        repo = Repo(self.state.current_repo_path)
+        
+        # Get files changed in this commit
+        files_in_commit = commit_file_map.get(commit_hash, [])
+        
+        # Checkout the commit to read actual file state at this commit
+        current_branch = repo.active_branch.name
+        try:
+            # Checkout the commit
+            repo.git.checkout(commit_hash)
+            
+            # Initialize dependency tracking
+            file_dependencies = {}
+            function_dependencies = {}
+            
+            # Process each file in the repository at this commit point
+            for root, dirs, files in os.walk(self.state.current_repo_path):
+                # Skip hidden directories and git directory
+                dirs[:] = [d for d in dirs if not d.startswith('.') and d != '.git']
+                
+                for filename in files:
+                    file_path = os.path.join(root, filename)
+                    rel_path = os.path.relpath(file_path, self.state.current_repo_path)
+                    
+                    # Skip binary files and non-code files
+                    if is_binary_file(file_path) or is_asset_file(file_path):
+                        continue
+                    
+                    # Read the content of the file
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        
+                        # Skip empty files or very large files
+                        if not content or len(content) > 100000:  # Skip files larger than 100KB
+                            continue
+                        
+                        # Extract file dependencies
+                        file_deps = self._extract_file_dependencies(rel_path, content)
+                        file_dependencies[rel_path] = file_deps
+                        
+                        # Extract function dependencies
+                        if rel_path.endswith(('.py', '.js', '.jsx', '.ts', '.tsx')):
+                            func_deps = self._extract_function_dependencies(rel_path, content)
+                            function_dependencies[rel_path] = func_deps
+                            
+                    except Exception as e:
+                        logger.warning(f"Error processing file {rel_path} at commit {commit_hash}: {e}")
+                        
+            # Now generate graphs based on the complete repository state at this commit
+            
+            # 1. File dependency graph
+            file_graph = self._build_file_dependency_graph(file_dependencies)
+            file_graph_path = output_dir / f"file_dependency_{commit_hash[:8]}.png"
+            self._save_graph(file_graph, file_graph_path, "File Dependencies")
+            
+            # 2. Function call graph
+            func_graph = self._build_function_dependency_graph(function_dependencies)
+            func_graph_path = output_dir / f"function_dependency_{commit_hash[:8]}.png"
+            self._save_graph(func_graph, func_graph_path, "Function Call Dependencies")
+            
+            # Store the dependency data for future reference
+            dependency_data = {
+                "file_dependencies": file_dependencies,
+                "function_dependencies": function_dependencies
+            }
+            
+            # Save dependency data as JSON
+            import json
+            with open(output_dir / f"dependencies_{commit_hash[:8]}.json", 'w', encoding='utf-8') as f:
+                json.dump(dependency_data, f, indent=2, ensure_ascii=False)
+            
+        finally:
+            # Always restore the original branch
+            repo.git.checkout(current_branch)
+        
+        return str(output_dir)
+
+    def _extract_file_dependencies(self, file_path, content):
+        """Extract file dependencies from file content"""
+        dependencies = {
+            "imports": [],
+            "imported_by": [],
+            "references": []
+        }
+        
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        # Python file dependencies
+        if file_ext == '.py':
+            # Regular imports
+            import_patterns = [
+                re.compile(r'^import\s+([^\s,;]+)(?:\s*,\s*([^\s,;]+))*', re.MULTILINE),  # import x, y
+                re.compile(r'^from\s+([^\s]+)\s+import\s+([^#\n]+)', re.MULTILINE),  # from x import y
+            ]
+            
+            for pattern in import_patterns:
+                for match in pattern.finditer(content):
+                    if match.group(0).startswith('from'):
+                        module = match.group(1).strip()
+                        # Check if it's a relative import
+                        if module.startswith('.'):
+                            # Convert relative import to potential file path
+                            relative_path = os.path.normpath(
+                                os.path.join(os.path.dirname(file_path), 
+                                            module.strip('.').replace('.', '/'))
+                            )
+                            if module.strip('.'):  # Not just '.'
+                                dependencies["imports"].append(f"{relative_path}.py")
+                        else:
+                            # Handle absolute imports
+                            if '.' in module and not module.startswith(('os', 'sys', 're', 'json')):
+                                # Could be a project module
+                                module_path = module.replace('.', '/') + '.py'
+                                dependencies["imports"].append(module_path)
+                    else:
+                        # Handle 'import x' or 'import x, y, z'
+                        for i in range(1, match.lastindex + 1 if match.lastindex else 2):
+                            if match.group(i):
+                                module = match.group(i).strip()
+                                if '.' in module and not module.startswith(('os', 'sys', 're', 'json')):
+                                    module_path = module.replace('.', '/') + '.py'
+                                    dependencies["imports"].append(module_path)
+        
+        # JavaScript/TypeScript file dependencies
+        elif file_ext in ['.js', '.jsx', '.ts', '.tsx']:
+            import_patterns = [
+                re.compile(r'import\s+(?:{[^}]+}|[^{}\s]+)\s+from\s+[\'"]([^\'"]+)[\'"]', re.MULTILINE),  # import x from 'y'
+                re.compile(r'import\s+[\'"]([^\'"]+)[\'"]', re.MULTILINE),  # import 'x'
+                re.compile(r'require\([\'"]([^\'"]+)[\'"]\)', re.MULTILINE),  # require('x')
+            ]
+            
+            for pattern in import_patterns:
+                for match in pattern.finditer(content):
+                    module_path = match.group(1).strip()
+                    
+                    # Filter out node_modules and external packages
+                    if (module_path.startswith('./') or 
+                        module_path.startswith('../') or 
+                        not ('/' in module_path and not module_path.startswith('@'))):
+                        
+                        # Normalize the path
+                        normalized_path = os.path.normpath(
+                            os.path.join(os.path.dirname(file_path), module_path)
+                        )
+                        
+                        # Add potential extensions if missing
+                        if not os.path.splitext(normalized_path)[1]:
+                            for ext in ['.js', '.jsx', '.ts', '.tsx']:
+                                dependencies["imports"].append(normalized_path + ext)
+                        else:
+                            dependencies["imports"].append(normalized_path)
+        
+        return dependencies
+
+    def _extract_function_dependencies(self, file_path, content):
+        """Extract function dependencies from file content"""
+        function_info = {
+            "functions": [],
+            "function_calls": {},  # function -> [called functions]
+            "called_by": {}  # function -> [calling functions]
+        }
+        
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        # Python function extraction
+        if file_ext == '.py':
+            # Find all function definitions
+            function_pattern = re.compile(r'^def\s+([a-zA-Z0-9_]+)\s*\([^)]*\):', re.MULTILINE)
+            functions = [m.group(1) for m in function_pattern.finditer(content)]
+            function_info["functions"] = functions
+            
+            # For each function, find calls to other functions
+            for func_name in functions:
+                # Find the function body
+                func_pattern = re.compile(
+                    r'def\s+' + re.escape(func_name) + r'\s*\([^)]*\):\s*(.*?)(?=\n\S|$)',
+                    re.DOTALL
+                )
+                func_matches = func_pattern.findall(content)
+                
+                if func_matches:
+                    func_body = func_matches[0]
+                    calls = []
+                    
+                    # Look for calls to other functions
+                    for other_func in functions:
+                        if other_func != func_name and re.search(
+                            r'\b' + re.escape(other_func) + r'\s*\(', func_body
+                        ):
+                            calls.append(other_func)
+                            
+                            # Track who calls whom
+                            if other_func not in function_info["called_by"]:
+                                function_info["called_by"][other_func] = []
+                            function_info["called_by"][other_func].append(func_name)
+                    
+                    if calls:
+                        function_info["function_calls"][func_name] = calls
+        
+        # JavaScript/TypeScript function extraction            
+        elif file_ext in ['.js', '.jsx', '.ts', '.tsx']:
+            # Various patterns to catch JS function definitions
+            function_patterns = [
+                re.compile(r'function\s+([a-zA-Z0-9_$]+)\s*\(', re.MULTILINE),  # function x()
+                re.compile(r'(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>', re.MULTILINE),  # const x = () =>
+                re.compile(r'(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*function', re.MULTILINE),  # const x = function
+                re.compile(r'([a-zA-Z0-9_$]+)\s*:\s*function', re.MULTILINE),  # x: function
+                re.compile(r'([a-zA-Z0-9_$]+)\([^)]*\)\s*{', re.MULTILINE),  # x() { (method)
+            ]
+            
+            # Collect all function definitions
+            functions = []
+            for pattern in function_patterns:
+                funcs = [m.group(1) for m in pattern.finditer(content)]
+                functions.extend(funcs)
+            
+            # Remove duplicates
+            functions = list(set(functions))
+            function_info["functions"] = functions
+            
+            # Simplified function call analysis (for a more accurate analysis, we'd need AST parsing)
+            for func_name in functions:
+                # Find potential calls to other functions
+                # This is a simplified approach; real JS analysis would be more complex
+                calls = []
+                for other_func in functions:
+                    if other_func != func_name and re.search(
+                        r'\b' + re.escape(other_func) + r'\s*\(', content
+                    ):
+                        calls.append(other_func)
+                        
+                        # Track who calls whom
+                        if other_func not in function_info["called_by"]:
+                            function_info["called_by"][other_func] = []
+                        function_info["called_by"][other_func].append(func_name)
+                
+                if calls:
+                    function_info["function_calls"][func_name] = calls
+        
+        return function_info
+
+    def _build_file_dependency_graph(self, file_dependencies):
+        """Build file dependency graph from extracted dependencies"""
+        import networkx as nx
+        
+        G = nx.DiGraph()
+        
+        # Add nodes for all files
+        for file_path in file_dependencies:
+            # Add node with file extension as attribute
+            ext = os.path.splitext(file_path)[1].lower()
+            G.add_node(file_path, type='file', extension=ext)
+        
+        # Add edges based on imports
+        for file_path, deps in file_dependencies.items():
+            for imported_file in deps["imports"]:
+                # Check if the imported file exists in our dependency map
+                if imported_file in file_dependencies:
+                    G.add_edge(file_path, imported_file)
+                    
+                    # Also update the imported_by list for cross-reference
+                    if file_path not in file_dependencies[imported_file]["imported_by"]:
+                        file_dependencies[imported_file]["imported_by"].append(file_path)
+        
+        return G
+
+    def _build_function_dependency_graph(self, function_dependencies):
+        """Build function call graph from extracted dependencies"""
+        import networkx as nx
+        
+        G = nx.DiGraph()
+        
+        # Track all functions across files
+        all_functions = {}  # file_path:function_name -> node_id
+        
+        # Add nodes for all functions
+        for file_path, func_info in function_dependencies.items():
+            for func_name in func_info["functions"]:
+                # Create unique identifier for this function
+                node_id = f"{file_path}:{func_name}"
+                G.add_node(node_id, function=func_name, file=file_path)
+                all_functions[node_id] = func_name
+        
+        # Add edges based on function calls
+        for file_path, func_info in function_dependencies.items():
+            for caller, callees in func_info["function_calls"].items():
+                caller_id = f"{file_path}:{caller}"
+                
+                for callee in callees:
+                    callee_id = f"{file_path}:{callee}"  # Default to same file
+                    
+                    # Check if the callee exists in this file
+                    if callee_id in all_functions:
+                        G.add_edge(caller_id, callee_id)
+                    else:
+                        # If not found in this file, it might be from another file
+                        # This is a simplified approach; actual cross-file function resolution would be more complex
+                        for other_file, other_info in function_dependencies.items():
+                            if other_file != file_path and callee in other_info["functions"]:
+                                other_callee_id = f"{other_file}:{callee}"
+                                G.add_edge(caller_id, other_callee_id)
+                                break
+        
+        return G
+    def _save_graph(self, G, output_path, title):
+        """Save a graph visualization to file"""
+        import matplotlib
+        # Set non-interactive backend to avoid GUI thread issues
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import networkx as nx
+
+        plt.figure(figsize=(12, 8))
+
+        # Different layout algorithms for different graph sizes
+        if len(G.nodes) < 20:
+            pos = nx.spring_layout(G, seed=42)
+        else:
+            pos = nx.kamada_kawai_layout(G)
+
+        # Check if graph has extension attribute
+        if any("extension" in G.nodes[n] for n in G.nodes):
+            # Color nodes by file extension
+            extension_colors = {
+                ".py": "skyblue",
+                ".js": "lightgreen",
+                ".jsx": "green",
+                ".ts": "yellow",
+                ".tsx": "orange",
+                ".html": "salmon",
+                ".css": "violet",
+                ".json": "khaki",
+            }
+
+            node_colors = [
+                extension_colors.get(G.nodes[n].get("extension", ""), "lightgray")
+                for n in G.nodes
+            ]
+
+            nx.draw(
+                G,
+                pos,
+                with_labels=True,
+                labels={n: os.path.basename(n) for n in G.nodes},
+                node_color=node_colors,
+                node_size=800,
+                edge_color="gray",
+                arrows=True,
+            )
+        else:
+            # Simple graph drawing
+            nx.draw(
+                G,
+                pos,
+                with_labels=True,
+                node_color="lightblue",
+                node_size=800,
+                edge_color="gray",
+                arrows=True,
+            )
+
+        plt.title(title)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        return str(output_path)
+
+    def _analyze_diff_content(self, diff_text):
+        """
+        Analyzes diff content to extract meaningful change information
+        Returns a structured summary of changes
+        """
+        summary = {
+            "lines_added": 0,
+            "lines_removed": 0,
+            "additions": [],
+            "deletions": [],
+            "modifications": [],
+            "functions_added": [],
+            "functions_modified": [],
+            "functions_removed": [],
+            "change_type": "unknown",
+        }
+
+        # Simple pattern matching for Python functions
+        function_pattern = re.compile(
+            r"^[\+\-]\s*def\s+([a-zA-Z0-9_]+)\s*\(", re.MULTILINE
+        )
+        class_pattern = re.compile(r"^[\+\-]\s*class\s+([a-zA-Z0-9_]+)", re.MULTILINE)
+        import_pattern = re.compile(
+            r"^[\+\-]\s*(?:import|from)\s+([^\s]+)", re.MULTILINE
+        )
+
+        # Count added/removed lines
+        for line in diff_text.split("\n"):
+            if line.startswith("+") and not line.startswith("+++"):
+                summary["lines_added"] += 1
+                summary["additions"].append(line[1:].strip())
+            elif line.startswith("-") and not line.startswith("---"):
+                summary["lines_removed"] += 1
+                summary["deletions"].append(line[1:].strip())
+
+        # Extract function changes
+        added_functions = [
+            m.group(1)
+            for m in function_pattern.finditer(diff_text)
+            if m.group(0).startswith("+")
+        ]
+        removed_functions = [
+            m.group(1)
+            for m in function_pattern.finditer(diff_text)
+            if m.group(0).startswith("-")
+        ]
+
+        # Functions that appear in both added and removed are likely modifications
+        modified_functions = set(added_functions) & set(removed_functions)
+        truly_added_functions = set(added_functions) - modified_functions
+        truly_removed_functions = set(removed_functions) - modified_functions
+
+        summary["functions_added"] = list(truly_added_functions)
+        summary["functions_removed"] = list(truly_removed_functions)
+        summary["functions_modified"] = list(modified_functions)
+
+        # Similarly handle class changes
+        added_classes = [
+            m.group(1)
+            for m in class_pattern.finditer(diff_text)
+            if m.group(0).startswith("+")
+        ]
+        removed_classes = [
+            m.group(1)
+            for m in class_pattern.finditer(diff_text)
+            if m.group(0).startswith("-")
+        ]
+
+        # And import changes
+        added_imports = [
+            m.group(1)
+            for m in import_pattern.finditer(diff_text)
+            if m.group(0).startswith("+")
+        ]
+        removed_imports = [
+            m.group(1)
+            for m in import_pattern.finditer(diff_text)
+            if m.group(0).startswith("-")
+        ]
+
+        # Determine overall change type
+        if summary["lines_added"] > 0 and summary["lines_removed"] == 0:
+            summary["change_type"] = "addition"
+        elif summary["lines_added"] == 0 and summary["lines_removed"] > 0:
+            summary["change_type"] = "deletion"
+        elif summary["lines_added"] > 0 and summary["lines_removed"] > 0:
+            summary["change_type"] = "modification"
+
+        # Additional metadata
+        summary["classes_added"] = added_classes
+        summary["classes_removed"] = removed_classes
+        summary["imports_added"] = added_imports
+        summary["imports_removed"] = removed_imports
+
+        return summary
+
     def summarize_repository_files(self):
-        """Summarize all files in the current repository"""
+        def extract_dependencies(file_path, content):
+            """
+            Enhanced dependency extraction that captures all types of dependencies
+            """
+            file_ext = os.path.splitext(file_path)[1].lower()
+            dependencies = {
+                "imports": [],
+                "functions": [],
+                "classes": [],
+                "file_dependencies": [],
+                "function_calls": {},  # Map of which functions call which others
+            }
+
+            # Python-specific extraction
+            if file_ext == ".py":
+                # Import patterns
+                import_patterns = [
+                    re.compile(
+                        r"^import\s+([^\s,;]+)(?:\s*,\s*([^\s,;]+))*", re.MULTILINE
+                    ),  # import x, y
+                    re.compile(
+                        r"^from\s+([^\s]+)\s+import\s+([^#\n]+)", re.MULTILINE
+                    ),  # from x import y
+                ]
+
+                # Function and class patterns
+                function_pattern = re.compile(
+                    r"^def\s+([a-zA-Z0-9_]+)\s*\([^)]*\):", re.MULTILINE
+                )
+                class_pattern = re.compile(r"^class\s+([a-zA-Z0-9_]+)", re.MULTILINE)
+
+                # Find all imports
+                for pattern in import_patterns:
+                    for match in pattern.finditer(content):
+                        if match.group(0).startswith("from"):
+                            module = match.group(1).strip()
+                            imported_items = [
+                                item.strip() for item in match.group(2).split(",")
+                            ]
+
+                            # Check if it's a local import
+                            if not module.startswith(".") and "." not in module:
+                                dependencies["imports"].append(
+                                    f"from {module} import {', '.join(imported_items)}"
+                                )
+                            else:
+                                # Could be a local file dependency
+                                if module.startswith("."):
+                                    # Relative import
+                                    relative_path = os.path.normpath(
+                                        os.path.join(
+                                            os.path.dirname(file_path),
+                                            module.strip(".").replace(".", "/"),
+                                        )
+                                    )
+                                    if module.strip("."):  # Not just '.'
+                                        dependencies["file_dependencies"].append(
+                                            f"{relative_path}.py"
+                                        )
+                                else:
+                                    # Absolute import within project
+                                    dependencies["file_dependencies"].append(
+                                        f"{module.replace('.', '/')}.py"
+                                    )
+                        else:
+                            # Handle 'import x' or 'import x, y, z'
+                            for i in range(
+                                1, match.lastindex + 1 if match.lastindex else 2
+                            ):
+                                if match.group(i):
+                                    module = match.group(i).strip()
+                                    dependencies["imports"].append(f"import {module}")
+
+                # Extract all functions and classes first
+                functions = [m.group(1) for m in function_pattern.finditer(content)]
+                dependencies["functions"] = functions
+                dependencies["classes"] = [
+                    m.group(1) for m in class_pattern.finditer(content)
+                ]
+
+                # Now analyze each function to find its calls
+                for func_name in functions:
+                    # Find the function body
+                    func_pattern = re.compile(
+                        r"def\s+"
+                        + re.escape(func_name)
+                        + r"\s*\([^)]*\):\s*(.*?)(?=\n\S|$)",
+                        re.DOTALL,
+                    )
+                    func_matches = func_pattern.findall(content)
+
+                    if func_matches:
+                        func_body = func_matches[0]
+                        calls = []
+
+                        # Look for calls to other functions in this file
+                        for other_func in functions:
+                            if other_func != func_name and re.search(
+                                r"\b" + re.escape(other_func) + r"\s*\(", func_body
+                            ):
+                                calls.append(other_func)
+
+                        if calls:
+                            dependencies["function_calls"][func_name] = calls
+
+            # JavaScript/TypeScript-specific extraction
+            elif file_ext in [".js", ".ts", ".jsx", ".tsx"]:
+                # Import patterns for JS/TS
+                js_import_patterns = [
+                    re.compile(
+                        r'import\s+(?:{[^}]+}|[^{}\s]+)\s+from\s+[\'"]([^\'"]+)[\'"]',
+                        re.MULTILINE,
+                    ),  # import x from 'y'
+                    re.compile(r'import\s+[\'"]([^\'"]+)[\'"]', re.MULTILINE),  # import 'x'
+                    re.compile(
+                        r'require\([\'"]([^\'"]+)[\'"]\)', re.MULTILINE
+                    ),  # require('x')
+                ]
+
+                # Function patterns for JS/TS (expanded to catch more patterns)
+                js_function_patterns = [
+                    re.compile(
+                        r"function\s+([a-zA-Z0-9_$]+)\s*\(", re.MULTILINE
+                    ),  # function x()
+                    re.compile(
+                        r"(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
+                        re.MULTILINE,
+                    ),  # const x = () =>
+                    re.compile(
+                        r"(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*function", re.MULTILINE
+                    ),  # const x = function()
+                    re.compile(
+                        r"([a-zA-Z0-9_$]+)\s*:\s*function", re.MULTILINE
+                    ),  # x: function
+                    re.compile(
+                        r"([a-zA-Z0-9_$]+)\([^)]*\)\s*{", re.MULTILINE
+                    ),  # x() { (method in class/object)
+                ]
+
+                # Class pattern for JS/TS
+                js_class_pattern = re.compile(r"class\s+([a-zA-Z0-9_$]+)", re.MULTILINE)
+
+                # Find all imports
+                for pattern in js_import_patterns:
+                    for match in pattern.finditer(content):
+                        module_path = match.group(1).strip()
+                        dependencies["imports"].append(module_path)
+
+                        # Check if it's a local import
+                        if (
+                            module_path.startswith("./")
+                            or module_path.startswith("../")
+                            or not (module_path.startswith("@") or "/" not in module_path)
+                        ):
+                            # Normalize and add extension if missing
+                            local_path = os.path.normpath(
+                                os.path.join(os.path.dirname(file_path), module_path)
+                            )
+                            if not os.path.splitext(local_path)[1]:
+                                # Try common extensions
+                                for ext in [".js", ".jsx", ".ts", ".tsx"]:
+                                    possible_path = local_path + ext
+                                    dependencies["file_dependencies"].append(possible_path)
+                            else:
+                                dependencies["file_dependencies"].append(local_path)
+
+                # Find all functions
+                functions = []
+                for pattern in js_function_patterns:
+                    for match in pattern.finditer(content):
+                        functions.append(match.group(1))
+
+                dependencies["functions"] = functions
+                dependencies["classes"] = [
+                    m.group(1) for m in js_class_pattern.finditer(content)
+                ]
+
+                # Simplified function call analysis for JS (more complex in reality)
+                for func_name in functions:
+                    # This is a simplified approximation; real JS analysis would require an AST
+                    calls = []
+                    for other_func in functions:
+                        if other_func != func_name and re.search(
+                            r"\b" + re.escape(other_func) + r"\s*\(", content
+                        ):
+                            calls.append(other_func)
+
+                    if calls:
+                        dependencies["function_calls"][func_name] = calls
+
+            return dependencies
+
+        def summarize_file(file_path, file_content, dependencies):
+            """
+            Enhanced file summarization that emphasizes dependencies for graph generation
+            """
+            prompt = f"""
+            You are a code analysis assistant. Provide a detailed summary of the following file.
+            
+            IMPORTANT REQUIREMENTS:
+            1. Start with an overview of the file's main purpose in 1-2 sentences
+            2. List ALL import statements EXACTLY as they appear in the code (preserve them precisely)
+            3. List ALL functions with their signatures and a brief description
+            4. List ALL classes with their inheritance structure and a brief description
+            5. Explicitly identify ALL function calls between functions in this file
+            6. Clearly identify ALL dependencies on other local files (not standard libraries)
+            7. Format your response with clear headings for each section
+            
+            This information will be used for:
+            - Understanding code dependencies
+            - Generating accurate dependency graphs
+            - Retrieving relevant information based on queries
+            
+            EXTERNAL ANALYSIS RESULTS:
+            Identified imports: {dependencies['imports']}
+            Identified functions: {dependencies['functions']}
+            Identified classes: {dependencies['classes']}
+            Identified file dependencies: {dependencies['file_dependencies']}
+            Identified function calls: {dependencies['function_calls']}
+            
+            File path: {file_path}
+            File content:
+            
+            {file_content}
+            """
+
+            retries = 3
+            for attempt in range(retries):
+                try:
+                    response = llm.invoke(prompt)
+                    return response.content
+                except Exception as e:
+                    if "429" in str(e):
+                        logger.warning("Quota exceeded. Retrying after delay...")
+                        time.sleep(35)
+                    else:
+                        raise e
+            return "Error: Failed after multiple retries."
+
+
+
+        """Summarize all files in the current repository with enhanced dependency tracking"""
         if not self.state.current_repo_path:
             return False, "No repository currently loaded"
 
         repo_path = self.state.current_repo_path
-        logger.info(f"Starting file summarization for repository: {repo_path}")
+        logger.info(f"Starting enhanced file summarization for repository: {repo_path}")
 
         # Clear previous summaries
-        summary_file = self.config.summaries_dir / "summaries.txt"
+        summaries_dir = self.config.summaries_dir
+        if not summaries_dir.exists():
+            summaries_dir.mkdir(parents=True)
+
+        summary_file = summaries_dir / "summaries.txt"
+        dependency_file = summaries_dir / "dependencies.json"
+        function_call_file = summaries_dir / "function_calls.json"
+
         if summary_file.exists():
             summary_file.unlink()
+        if dependency_file.exists():
+            dependency_file.unlink()
+        if function_call_file.exists():
+            function_call_file.unlink()
 
         try:
             llm = self.get_llm()
             summaries = {}
+            file_dependencies = {}  # Track dependencies between files
+            all_function_calls = {}  # Track function calls across the project
 
             def get_file_content(file_path):
                 """Reads the content of a file."""
                 with open(file_path, "r", encoding="utf-8", errors="ignore") as file:
                     return file.read()
-
-            def summarize_file(file_content):
-                prompt = (
-                    "You are a helpful assistant. Provide concise summaries of the text. "
-                    "If the file contains any code write about every function present in the file, "
-                    "else describe the file contents clearly like how you would explain it to a 5 year old. Please keep all import statements to preserve the dependencies."
-                    "\n\n" + file_content
-                )
-
-                retries = 3
-                for attempt in range(retries):
-                    try:
-                        response = llm.invoke(prompt)
-                        return response.content
-                    except Exception as e:
-                        if "429" in str(e):
-                            logger.warning("Quota exceeded. Retrying after delay...")
-                            time.sleep(35)
-                        else:
-                            raise e
-                return "Error: Failed after multiple retries."
 
             # Walk through the repo directory
             repo_path_obj = Path(repo_path)
@@ -248,19 +1158,22 @@ class GitAnalysisService:
 
                 for filename in files:
                     file_path = Path(root) / filename
+                    relative_path = str(file_path.relative_to(repo_path_obj))
 
                     # Skip binary files and other non-text files
                     if is_binary_file(file_path):
                         continue
+                    if file_path == "__pycache__":
+                        continue
                     # Handle asset files differently - just record them without summarizing
                     if is_asset_file(file_path):
                         # Store a simple record of the asset file
-                        relative_path = str(file_path.relative_to(repo_path_obj))
                         summaries[relative_path] = (
                             f"[ASSET FILE] {filename} - Type: {file_path.suffix}"
                         )
                         logger.info(f"Recorded asset file: {relative_path}")
                         continue
+
                     try:
                         # Read the file content
                         file_content = get_file_content(file_path)
@@ -271,14 +1184,19 @@ class GitAnalysisService:
                         ):  # Skip files larger than 100KB
                             continue
 
+                        # Extract dependencies
+                        dependencies = extract_dependencies(relative_path, file_content)
+                        file_dependencies[relative_path] = dependencies
+
                         # Get the summary of the content
-                        summary = summarize_file(file_content)
+                        summary = summarize_file(
+                            relative_path, file_content, dependencies
+                        )
                         time.sleep(
                             1.5
                         )  # Add delay between API calls to avoid rate limiting
 
                         # Store the summary in the dictionary with relative file path
-                        relative_path = str(file_path.relative_to(repo_path_obj))
                         summaries[relative_path] = summary
                         logger.info(f"Summarized: {relative_path}")
 
@@ -292,12 +1210,16 @@ class GitAnalysisService:
                     file.write(f"{summary}\n")
                     file.write("\n" + "=" * 50 + "\n")
 
+            # Write dependencies to a JSON file
+            with open(dependency_file, "w", encoding="utf-8") as file:
+                json.dump(file_dependencies, file, indent=2)
+
             logger.info(
                 f"Summarization complete. Created summaries for {len(summaries)} files."
             )
             return (
                 True,
-                f"Summarization complete. Created summaries for {len(summaries)} files.",
+                f"Summarization complete. Created summaries for {len(summaries)} files with dependency tracking.",
             )
 
         except Exception as e:
@@ -305,12 +1227,12 @@ class GitAnalysisService:
             return False, f"Error summarizing repository files: {e}"
 
     def create_vector_database(self):
-        """Create a vector database from repository files, summaries, and git history"""
+        """Create an enhanced vector database from repository files, summaries, and git history"""
         if not self.state.current_repo_path:
             return False, "No repository currently loaded"
 
         repo_path = self.state.current_repo_path
-        logger.info("Starting vector database creation")
+        logger.info("Starting enhanced vector database creation")
 
         try:
             from langchain.docstore.document import Document
@@ -318,7 +1240,7 @@ class GitAnalysisService:
             from langchain_community.vectorstores import FAISS
             from langchain_huggingface.embeddings import HuggingFaceEmbeddings
 
-            # Load documents from folders
+            # Load documents from folders with metadata enrichment
             def load_folder(folder_path, source_label):
                 folder = Path(folder_path)
                 docs = []
@@ -329,12 +1251,48 @@ class GitAnalysisService:
                                 file, "r", encoding="utf-8", errors="ignore"
                             ) as f:
                                 content = f.read()
+
+                                # Enhanced metadata
+                                metadata = {
+                                    "file_path": str(file),
+                                    "source": source_label,
+                                    "filename": file.name,
+                                    "file_type": file.suffix,
+                                    "creation_time": str(file.stat().st_ctime),
+                                    "size": file.stat().st_size,
+                                }
+
+                                # Special handling for JSON files to improve retrieval
+                                if file.suffix == ".json":
+                                    try:
+                                        json_data = json.loads(content)
+                                        # For commit history files, add specific metadata
+                                        if (
+                                            file.name == "commit_history.json"
+                                            or file.name == "repo_history.json"
+                                        ):
+                                            if "commits" in json_data:
+                                                metadata["commit_count"] = len(
+                                                    json_data.get("commits", [])
+                                                )
+                                                metadata["first_commit"] = (
+                                                    json_data.get(
+                                                        "first_commit_date", ""
+                                                    )
+                                                )
+                                                metadata["last_commit"] = json_data.get(
+                                                    "last_commit_date", ""
+                                                )
+                                                if "file_path" in json_data:
+                                                    metadata["source_file"] = (
+                                                        json_data.get("file_path", "")
+                                                    )
+                                    except:
+                                        pass  # If JSON parsing fails, continue with standard metadata
+
                                 doc = Document(
                                     page_content=content,
-                                    metadata={
-                                        "file_path": str(file),
-                                        "source": source_label,
-                                    },
+                                    metadata=metadata,
                                 )
                                 docs.append(doc)
                         except Exception as e:
@@ -357,12 +1315,53 @@ class GitAnalysisService:
                                 ):  # Skip files larger than 100KB
                                     continue
 
+                                # Enhanced metadata for code files
+                                rel_path = file.relative_to(folder)
+                                metadata = {
+                                    "file_path": str(file),
+                                    "relative_path": str(rel_path),
+                                    "source": source_label,
+                                    "filename": file.name,
+                                    "file_type": file.suffix,
+                                    "directory": str(file.parent.relative_to(folder)),
+                                }
+
+                                # Additional metadata for code files
+                                if file.suffix in [
+                                    ".py",
+                                    ".js",
+                                    ".ts",
+                                    ".jsx",
+                                    ".tsx",
+                                    ".java",
+                                    ".cpp",
+                                    ".c",
+                                ]:
+                                    # Simple heuristics to identify key elements
+                                    imports = re.findall(
+                                        r"^\s*(?:import|from|require)\s+.*$",
+                                        content,
+                                        re.MULTILINE,
+                                    )
+                                    functions = re.findall(
+                                        r"^\s*(?:def|function|const\s+\w+\s*=\s*\(.*?\)\s*=>)\s+\w+",
+                                        content,
+                                        re.MULTILINE,
+                                    )
+                                    classes = re.findall(
+                                        r"^\s*class\s+\w+", content, re.MULTILINE
+                                    )
+
+                                    metadata["imports_count"] = len(imports)
+                                    metadata["functions_count"] = len(functions)
+                                    metadata["classes_count"] = len(classes)
+                                    metadata["contains_imports"] = len(imports) > 0
+                                    metadata["contains_functions"] = len(functions) > 0
+                                    metadata["contains_classes"] = len(classes) > 0
+
                                 doc = Document(
                                     page_content=content,
-                                    metadata={
-                                        "file_path": str(file),
-                                        "source": source_label,
-                                    },
+                                    metadata=metadata,
                                 )
                                 docs.append(doc)
                         except Exception as e:
@@ -378,9 +1377,12 @@ class GitAnalysisService:
             all_docs = summary_docs + commit_diff_docs + repo_docs
             logger.info(f"Loaded {len(all_docs)} documents for vector database")
 
-            # Split into smaller chunks
+            # Enhanced splitting strategy with overlap for better context preservation
             splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000, chunk_overlap=100
+                chunk_size=1000,
+                chunk_overlap=200,  # Higher overlap to ensure context is preserved
+                separators=["\n\n", "\n", " ", ""],  # More granular separators
+                keep_separator=True,
             )
             split_docs = splitter.split_documents(all_docs)
 
@@ -404,11 +1406,11 @@ class GitAnalysisService:
             return False, f"Error creating vector database: {e}"
 
     def initialize_retrieval_chain(self):
-        """Initialize the retrieval chain for answering questions about the repository"""
+        """Initialize the enhanced retrieval chain for answering questions about the repository"""
         if not self.state.analysis_complete:
             return False, "Repository analysis not complete yet"
 
-        logger.info("Initializing retrieval chain")
+        logger.info("Initializing enhanced retrieval chain")
 
         try:
             from langchain_community.vectorstores import FAISS
@@ -416,6 +1418,8 @@ class GitAnalysisService:
             from langchain.chains import ConversationalRetrievalChain
             from langchain.memory import ConversationBufferMemory
             from langchain.prompts import PromptTemplate
+            from langchain.retrievers import ContextualCompressionRetriever
+            from langchain.retrievers.document_compressors import LLMChainExtractor
 
             # Load embeddings
             embeddings = HuggingFaceEmbeddings(model_name=self.config.embedding_model)
@@ -427,21 +1431,38 @@ class GitAnalysisService:
                 allow_dangerous_deserialization=True,
             )
 
-            # Create retriever
-            retriever = db.as_retriever(search_kwargs={"k": 5})
+            # Create base retriever with increased k for more comprehensive results
+            base_retriever = db.as_retriever(search_kwargs={"k": 15, "fetch_k": 30})
 
-            # Set up prompt
+            # Create LLM chain extractor for contextual compression
+            llm = self.get_llm(temperature=0.0)
+            compressor = LLMChainExtractor.from_llm(llm)
+
+            # Create contextual compression retriever
+            retriever = ContextualCompressionRetriever(
+                base_compressor=compressor, base_retriever=base_retriever
+            )
+
+            # Set up advanced prompt
             prompt = PromptTemplate(
                 input_variables=["context", "chat_history", "question"],
                 template="""
-                You are a Git repository analysis assistant. You help users understand codebases by analyzing
-                Git history, summarizing files, and answering questions about code changes and functionality. Please make sure that your response has newline characters \\n to separate the different sections.
+                You are a Git repository analysis assistant with advanced capabilities. You help users understand codebases by analyzing
+                Git history, summarizing files, and answering questions about code changes and functionality. 
                 
-                Use this context to help answer the user's query:
+                When analyzing code repositories:
+                1. For commit history queries, provide ALL relevant commit information chronologically
+                2. For file dependency queries, show complete relationships between files
+                3. For function/class queries, provide comprehensive information about their implementations
+                4. For change analysis queries, compare changes across commits in detail
+                
+                When you use this context, you may encounter diffs, or additions or deletions, you should carefully parse this yourself.
+                Use this comprehensive context to answer the user's query:
                 {context}
                 
                 Conversation so far:
                 {chat_history}
+                
                 Human: {question}
                 Assistant:""",
             )
@@ -451,19 +1472,20 @@ class GitAnalysisService:
                 memory_key="chat_history", return_messages=True, output_key="answer"
             )
 
-            # Create chain
+            # Create chain with additional parameters for more comprehensive retrieval
             retrieval_chain = ConversationalRetrievalChain.from_llm(
                 llm=self.get_llm(),
                 retriever=retriever,
                 memory=memory,
                 combine_docs_chain_kwargs={"prompt": prompt},
-                return_source_documents=True,  # Add this to return source documents
-                verbose=True,  # Make debug logging more visible
-                output_key="answer",  # Add this line to specify which output to store
+                return_source_documents=True,
+                verbose=True,
+                output_key="answer",
+                max_tokens_limit=8000,  # Allow for larger context window
             )
 
             self.state.mark_vector_db_loaded()
-            logger.info("Retrieval chain initialized successfully")
+            logger.info("Enhanced retrieval chain initialized successfully")
             return True, retrieval_chain
 
         except Exception as e:

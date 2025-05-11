@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2024-09-09T22:32:31+05:30",
-    "commit_hash": "b14158f86a585eb316cc66c031d519d243730989",
-    "commit_message": "add faqs",
-    "diff": "diff --git a/components/BuzzTile.js b/components/BuzzTile.js\nnew file mode 100644\nindex 0000000..3bb3318\n--- /dev/null\n+++ b/components/BuzzTile.js\n@@ -0,0 +1,37 @@\n+import Image from \"next/image\";\n+import Link from \"next/link\";\n+import React from \"react\";\n+import { FaArrowRight } from \"react-icons/fa\";\n+\n+const BuzzTile = ({ logo, headlineImg, newsOutlet, headline, href }) => {\n+  return (\n+    <Link\n+      className=\"w-auto group justify-center h-full m-4 p-4 rounded-2xl border-2 col-span-1 row-span-1 hover:shadow-2xl transition-all hover:scale-105 hover:border-slate-900\"\n+      href={href}\n+    >\n+      <Image\n+        className=\"h-32 object-contain mx-auto md:mx-0\"\n+        src={logo}\n+        alt={newsOutlet}\n+        width={200}\n+        height={200}\n+      />\n+\n+      <h1 className=\"text-xl md:text-2xl font-forum my-2\">\n+        &quot;{headline}&quot;\n+      </h1>\n+      {/* <h2>{newsOutlet}</h2> */}\n+      <div className=\"flex items-center transition-all text-blue-700 group-hover:text-blue-900\">\n+        <span>\n+          <FaArrowRight className=\"mr-2 group-hover:translate-x-1 transition-all\" />\n+        </span>\n+        <p className=\"text-lg md:text-xl uppercase font-forum\">\n+          READ MORE\n+          <span className=\"block max-w-0 group-hover:max-w-full duration-500 h-0.5 bg-blue-700\"></span>\n+        </p>\n+      </div>\n+    </Link>\n+  );\n+};\n+\n+export default BuzzTile;"
-  }
-]

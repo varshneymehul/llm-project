@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2024-09-02T00:26:09+05:30",
-    "commit_hash": "b143eb2c4d3bc866d3f805b979886d5e0d27f29c",
-    "commit_message": "Initial commit from Create Next App",
-    "diff": "diff --git a/jsconfig.json b/jsconfig.json\nnew file mode 100644\nindex 0000000..2a2e4b3\n--- /dev/null\n+++ b/jsconfig.json\n@@ -0,0 +1,7 @@\n+{\n+  \"compilerOptions\": {\n+    \"paths\": {\n+      \"@/*\": [\"./*\"]\n+    }\n+  }\n+}"
-  }
-]

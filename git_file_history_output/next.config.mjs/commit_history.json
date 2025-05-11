@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2024-09-02T00:26:09+05:30",
-    "commit_hash": "b143eb2c4d3bc866d3f805b979886d5e0d27f29c",
-    "commit_message": "Initial commit from Create Next App",
-    "diff": "diff --git a/next.config.mjs b/next.config.mjs\nnew file mode 100644\nindex 0000000..4678774\n--- /dev/null\n+++ b/next.config.mjs\n@@ -0,0 +1,4 @@\n+/** @type {import('next').NextConfig} */\n+const nextConfig = {};\n+\n+export default nextConfig;"
-  }
-]

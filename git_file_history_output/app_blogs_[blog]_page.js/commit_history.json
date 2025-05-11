@@ -1,8 +1,0 @@
-[
-  {
-    "commit_time": "2025-03-16T13:07:04+05:30",
-    "commit_hash": "18174b5388843cfc855512953172828af22344c5",
-    "commit_message": "for portfolio",
-    "diff": "diff --git a/app/blogs/[blog]/page.js b/app/blogs/[blog]/page.js\nnew file mode 100644\nindex 0000000..b97915a\n--- /dev/null\n+++ b/app/blogs/[blog]/page.js\n@@ -0,0 +1,15 @@\n+import Image from \"next/image\";\n+import React from \"react\";\n+\n+const BlogPage = ({ title, subheading, blogpost, img }) => {\n+  return (\n+    <main className=\"pt-[20vh]\">\n+      <h1>{title}</h1>\n+      <h2>{subheading}</h2>\n+      <Image src={img} alt=\"blog\" width={1000} height={600} />\n+      <p>{blogpost}</p>\n+    </main>\n+  );\n+};\n+\n+export default BlogPage;"
-  }
-]

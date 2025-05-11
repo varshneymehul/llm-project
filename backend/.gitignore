@@ -1,0 +1,5 @@
+__pycache__/
+faiss_repo_knowledge/
+git_file_history_output/
+summaries/
+cloned_repos/
