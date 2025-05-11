@@ -3,6 +3,7 @@ import logging
 import json
 from pathlib import Path
 from dotenv import load_dotenv
+import shutil
 
 # Set up logging
 logging.basicConfig(
@@ -37,10 +38,28 @@ class GitAnalysisConfig:
 
     def _create_directories(self):
         """Create necessary directories if they don't exist"""
+        if self.repos_dir.exists():
+            shutil.rmtree(self.repos_dir, ignore_errors=True)
+
+        if self.summaries_dir.exists():
+            shutil.rmtree(self.summaries_dir, ignore_errors=True)
+
+        if self.git_history_dir.exists():
+            shutil.rmtree(self.git_history_dir, ignore_errors=True)
+
+        if self.vector_db_dir.exists():
+            shutil.rmtree(self.vector_db_dir, ignore_errors=True)
+        
         self.repos_dir.mkdir(exist_ok=True)
         self.summaries_dir.mkdir(exist_ok=True)
         self.git_history_dir.mkdir(exist_ok=True)
         self.vector_db_dir.mkdir(exist_ok=True)
+
+        graph_folder = self.git_history_dir / "graphs"
+        if graph_folder.exists():
+            shutil.rmtree(graph_folder, ignore_errors=True)
+        graph_folder.mkdir(exist_ok=True)
+
 
     def get_repo_path(self, repo_name):
         """Get the full path to a repository"""
@@ -144,17 +163,36 @@ def is_binary_file(file_path):
     ]
     return Path(file_path).suffix.lower() in binary_extensions
 
+
 def is_asset_file(file_path):
     """Check if a file is an asset file (images, fonts, etc.)"""
     asset_extensions = [
         # Images
-        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".bmp",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".svg",
+        ".ico",
+        ".webp",
+        ".bmp",
         # Fonts
-        ".ttf", ".otf", ".woff", ".woff2", ".eot",
+        ".ttf",
+        ".otf",
+        ".woff",
+        ".woff2",
+        ".eot",
         # Other media
-        ".mp3", ".mp4", ".wav", ".ogg", ".avi", ".mov", 
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".ogg",
+        ".avi",
+        ".mov",
         # Other assets
-        ".pdf", ".psd", ".ai"
+        ".pdf",
+        ".psd",
+        ".ai",
     ]
     return Path(file_path).suffix.lower() in asset_extensions
 

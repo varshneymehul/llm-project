@@ -61,13 +61,14 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
+
 
 ROOT_URLCONF = "backend.urls"
 
@@ -143,4 +144,16 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWS_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True
+
+# Static files configuration
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+]
+
+# Add graph directory as a static file location
+GRAPHS_DIR = "/Users/mehulvarshney/Documents/College/Sem 4/IntroToLLM/project/backend/git_file_history_output/graphs"
+
+# Ensure directory exists
+if os.path.exists(GRAPHS_DIR):
+    STATICFILES_DIRS.append(GRAPHS_DIR)

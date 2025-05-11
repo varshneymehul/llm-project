@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.http import JsonResponse, StreamingHttpResponse
+from django.http import JsonResponse, StreamingHttpResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.response import Response
 from rest_framework.decorators import (
@@ -277,3 +277,83 @@ def reset_retrieval_chain(request):
             "repo_knowledge_requested": repo_knowledge_requested,
         }
     )
+
+
+# New view to list subdirectories in the graphs path
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def list_graph_folders(request):
+    base_path = "/Users/mehulvarshney/Documents/College/Sem 4/IntroToLLM/project/backend/git_file_history_output/graphs"
+    try:
+        folders = [
+            f
+            for f in os.listdir(base_path)
+            if os.path.isdir(os.path.join(base_path, f))
+        ]
+        return JsonResponse({"folders": sorted(folders)})
+    except Exception as e:
+        logger.error(f"Failed to list graph folders: {str(e)}")
+        return JsonResponse({"error": f"Failed to list folders: {str(e)}"}, status=500)
+
+
+# New view to get details of a specific graph folder
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def get_graph_folder_details(request, folder_name):
+    base_path = "/Users/mehulvarshney/Documents/College/Sem 4/IntroToLLM/project/backend/git_file_history_output/graphs"
+    folder_path = os.path.join(base_path, folder_name)
+    
+    try:
+        if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
+            return JsonResponse({"error": "Folder not found"}, status=404)
+        
+        # Find the files in the folder
+        file_image = None
+        functional_image = None
+        dependencies_file = None
+        
+        for file in os.listdir(folder_path):
+            if file.endswith(".png") or file.endswith(".jpg") or file.endswith(".svg"):
+                if "file" in file.lower() or "structure" in file.lower():
+                    file_image = file
+                elif "function" in file.lower() or "call" in file.lower():
+                    functional_image = file
+            elif file == "dependencies.json":
+                dependencies_file = file
+        
+        # Load dependencies if available
+        dependencies = {}
+        if dependencies_file:
+            with open(os.path.join(folder_path, dependencies_file), 'r') as f:
+                dependencies = json.load(f)
+        
+        return JsonResponse({
+            "folder": folder_name,
+            "fileImage": file_image,
+            "functionalImage": functional_image,
+            "dependencies": dependencies
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to get graph folder details: {str(e)}")
+        return JsonResponse({"error": f"Failed to get folder details: {str(e)}"}, status=500)
+
+
+# Serve static files from graph folders directly
+@api_view(["GET"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
+def serve_graph_file(request, folder, filename):
+    base_path = "/Users/mehulvarshney/Documents/College/Sem 4/IntroToLLM/project/backend/git_file_history_output/graphs"
+    file_path = os.path.join(base_path, folder, filename)
+    
+    try:
+        if not os.path.exists(file_path):
+            return JsonResponse({"error": "File not found"}, status=404)
+        
+        return FileResponse(open(file_path, 'rb'))
+    except Exception as e:
+        logger.error(f"Failed to serve graph file: {str(e)}")
+        return JsonResponse({"error": f"Failed to serve file: {str(e)}"}, status=500)
