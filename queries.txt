@@ -1,0 +1,9 @@
+What's the commit history of modifications, additions and deletions for index.html?
+
+what's the styles.css file having?
+
+what's the index.html file having?
+
+what are the main technologies used in the project
+
+Show me all commits related to the styling of the homepage

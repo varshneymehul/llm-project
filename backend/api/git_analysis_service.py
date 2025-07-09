@@ -861,7 +861,6 @@ class GitAnalysisService:
 
         # Count added/removed lines
         for line in diff_text.split("\n"):
-            print(summary["additions"])
             if line.startswith("+") and not line.startswith("+++"):
                 summary["lines_added"] += 1
                 summary["additions"].append(line[1:].strip())
@@ -1495,7 +1494,7 @@ class GitAnalysisService:
             )
 
             # Create base retriever with increased k for more comprehensive results
-            base_retriever = db.as_retriever(search_kwargs={"k": 30, "fetch_k": 40})
+            base_retriever = db.as_retriever(search_kwargs={"k": 10, "fetch_k": 25})
 
             # Create LLM chain extractor for contextual compression
             llm = self.get_llm(temperature=0.0)
