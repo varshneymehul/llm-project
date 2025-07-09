@@ -1,9 +1,3 @@
-Excellent question! This is a fantastic area for research, sitting at the intersection of Software Engineering, NLP, and Large Language Models (LLMs). For an undergraduate at a top institution like BITS Pilani, you want an idea that is novel, technically challenging but achievable, and has the potential for a great publication or a standout thesis project.
-
-Here is a novel research idea I've designed called **"RepoGnosis: Building a Causal and Temporal Knowledge Graph for Code Repository Q&A."**
-
----
-
 ### **The Core Idea: Moving Beyond "What" to "Why" and "How"**
 
 Current code Q&A agents (like GitHub Copilot Chat) are excellent at answering questions about the *current state* of the code. They can explain a function, write unit tests for it, or refactor it. This is answering the **"what"** question.
