@@ -86,4 +86,4 @@ This project can be broken down into manageable phases, perfect for an undergrad
 2.  **Tooling:** Play with the GitHub API. Install Neo4j and do their tutorials. Experiment with a pre-trained NER model from Hugging Face.
 3.  **Proof of Concept:** Pick one repository. Try to manually build a small KG for just one complex PR. This will reveal the challenges and inform your automated approach.
 
-This project goes beyond a simple application of an LLM and into the realm of structured knowledge representation, which is a more defensible and novel research contribution. Good luck
+This project goes beyond a simple application of an LLM and into the realm of structured knowledge representation, which is a more defensible and novel research contribution. 
